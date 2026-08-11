@@ -1,0 +1,26 @@
+# Node.js
+node_modules/
+.next/
+out/
+build/
+npm-debug.log*
+
+# 환경 변수 / 로컬 설정 (API 키 등 민감 정보 포함 가능)
+.env
+.env.local
+.env.*.local
+
+# SQLite 데이터베이스 (직원 개인정보가 담긴 실제 운영 데이터)
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+
+# 로컬 전용 설정 파일
+*.local.json
+
+# OS / 에디터
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
