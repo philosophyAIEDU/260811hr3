@@ -3,9 +3,9 @@
  * 항상 "직원별 가장 최근 진단 1건"만 집계에 사용합니다. (과거 진단까지 합치면 통계가 왜곡되므로)
  */
 import { NextRequest, NextResponse } from "next/server";
-import { ensureSchema, getSql } from "@/lib/db/db";
 import { ADMIN_CODE } from "@/lib/config/constants";
 import { COMPETENCY_NAMES } from "@/lib/config/competencies";
+import { getAllData } from "@/lib/db/store";
 
 function fail(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
@@ -18,37 +18,45 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    await ensureSchema();
-    const sql = getSql();
+    const data = await getAllData();
+    const totalEmployees = data.employees.length;
 
-    const totalEmployeesRows = await sql`SELECT COUNT(*)::int AS count FROM employees`;
-    const totalEmployees = totalEmployeesRows[0].count as number;
-
-    // 직원별 가장 최근 진단 회차 + 그 회차의 역량점수
-    const rows = await sql`
-      WITH latest AS (
-        SELECT DISTINCT ON (employee_id) assessment_id, employee_id
-        FROM assessments
-        ORDER BY employee_id, assessment_id DESC
-      )
-      SELECT e.employee_id, e.department, cs.competency_name, cs.current_score, cs.required_level
-      FROM latest l
-      JOIN employees e ON e.employee_id = l.employee_id
-      JOIN competency_scores cs ON cs.assessment_id = l.assessment_id
-    `;
-
-    const diagnosedEmployeeIds = new Set(rows.map((r) => r.employee_id as string));
-
-    // 부서별 평균 현재점수
-    const deptTotals = new Map<string, { sum: number; count: number; employees: Set<string> }>();
-    for (const r of rows) {
-      const dept = r.department as string;
-      const entry = deptTotals.get(dept) ?? { sum: 0, count: 0, employees: new Set<string>() };
-      entry.sum += r.current_score as number;
-      entry.count += 1;
-      entry.employees.add(r.employee_id as string);
-      deptTotals.set(dept, entry);
+    // 직원별 가장 최근 진단 회차 찾기
+    const latestByEmployee = new Map<string, number>();
+    for (const a of data.assessments) {
+      const current = latestByEmployee.get(a.employee_id);
+      if (!current || a.assessment_id > current) {
+        latestByEmployee.set(a.employee_id, a.assessment_id);
+      }
     }
+    const latestAssessmentIds = new Set(latestByEmployee.values());
+
+    const departmentOf = new Map(data.employees.map((e) => [e.employee_id, e.department]));
+
+    const deptTotals = new Map<string, { sum: number; count: number; employees: Set<string> }>();
+    const gapTotals = new Map<string, { sum: number; count: number }>();
+    for (const name of COMPETENCY_NAMES) gapTotals.set(name, { sum: 0, count: 0 });
+
+    for (const score of data.scores) {
+      if (!latestAssessmentIds.has(score.assessment_id)) continue;
+      const assessment = data.assessments.find((a) => a.assessment_id === score.assessment_id);
+      if (!assessment) continue;
+      const department = departmentOf.get(assessment.employee_id) ?? "미분류";
+
+      const deptEntry =
+        deptTotals.get(department) ?? { sum: 0, count: 0, employees: new Set<string>() };
+      deptEntry.sum += score.current_score;
+      deptEntry.count += 1;
+      deptEntry.employees.add(assessment.employee_id);
+      deptTotals.set(department, deptEntry);
+
+      const gapEntry = gapTotals.get(score.competency_name);
+      if (gapEntry) {
+        gapEntry.sum += score.required_level - score.current_score;
+        gapEntry.count += 1;
+      }
+    }
+
     const departmentAverages = Array.from(deptTotals.entries())
       .map(([department, v]) => ({
         department,
@@ -57,15 +65,6 @@ export async function GET(req: NextRequest) {
       }))
       .sort((a, b) => a.department.localeCompare(b.department));
 
-    // 전사 기준 부족역량 TOP5 (요구수준 - 현재점수 평균이 큰 순)
-    const gapTotals = new Map<string, { sum: number; count: number }>();
-    for (const name of COMPETENCY_NAMES) gapTotals.set(name, { sum: 0, count: 0 });
-    for (const r of rows) {
-      const entry = gapTotals.get(r.competency_name as string);
-      if (!entry) continue;
-      entry.sum += (r.required_level as number) - (r.current_score as number);
-      entry.count += 1;
-    }
     const competencyGapTop5 = Array.from(gapTotals.entries())
       .filter(([, v]) => v.count > 0)
       .map(([competency, v]) => ({ competency, averageGap: Math.round((v.sum / v.count) * 100) / 100 }))
@@ -74,7 +73,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       totalEmployees,
-      diagnosedEmployees: diagnosedEmployeeIds.size,
+      diagnosedEmployees: latestByEmployee.size,
       departmentAverages,
       competencyGapTop5,
     });

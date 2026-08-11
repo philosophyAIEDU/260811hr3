@@ -5,8 +5,8 @@
  * DELETE: 관리자 코드를 확인한 뒤 공용 키를 삭제합니다.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { ensureSchema, getSql } from "@/lib/db/db";
 import { ADMIN_CODE, SHARED_GEMINI_KEY_SETTING } from "@/lib/config/constants";
+import { deleteSetting, getSetting, setSetting } from "@/lib/db/store";
 
 function fail(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
@@ -14,11 +14,8 @@ function fail(message: string, status = 400) {
 
 export async function GET() {
   try {
-    await ensureSchema();
-    const sql = getSql();
-    const rows = await sql`SELECT value FROM app_settings WHERE key = ${SHARED_GEMINI_KEY_SETTING}`;
-    const configured = rows.length > 0 && rows[0].value.trim().length > 0;
-    return NextResponse.json({ configured });
+    const value = await getSetting(SHARED_GEMINI_KEY_SETTING);
+    return NextResponse.json({ configured: !!value && value.trim().length > 0 });
   } catch (err) {
     console.error("[GET /api/settings]", err);
     return fail("설정 정보를 불러오는 중 문제가 발생했습니다.", 500);
@@ -44,13 +41,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    await ensureSchema();
-    const sql = getSql();
-    await sql`
-      INSERT INTO app_settings (key, value)
-      VALUES (${SHARED_GEMINI_KEY_SETTING}, ${apiKey})
-      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
-    `;
+    await setSetting(SHARED_GEMINI_KEY_SETTING, apiKey);
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[POST /api/settings]", err);
@@ -72,9 +63,7 @@ export async function DELETE(req: NextRequest) {
   }
 
   try {
-    await ensureSchema();
-    const sql = getSql();
-    await sql`DELETE FROM app_settings WHERE key = ${SHARED_GEMINI_KEY_SETTING}`;
+    await deleteSetting(SHARED_GEMINI_KEY_SETTING);
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[DELETE /api/settings]", err);

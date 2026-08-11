@@ -4,7 +4,7 @@
  * POST : 처음 보는 사번을 부서·직무·직급과 함께 등록합니다.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { ensureSchema, getSql } from "@/lib/db/db";
+import { createEmployee, findEmployee } from "@/lib/db/store";
 
 function fail(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
@@ -19,18 +19,12 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    await ensureSchema();
-    const sql = getSql();
-    const rows = await sql`
-      SELECT employee_id, name, department, current_job, position, created_at
-      FROM employees WHERE employee_id = ${employeeId}
-    `;
+    const employee = await findEmployee(employeeId);
 
-    if (rows.length === 0) {
+    if (!employee) {
       return NextResponse.json({ found: false });
     }
 
-    const employee = rows[0];
     // 사번은 있지만 이름이 다르면, 사번 존재 여부를 알려주지 않고 동일한 안내만 표시합니다.
     if (employee.name !== name) {
       return fail("사번과 이름이 일치하지 않습니다. 다시 확인해 주세요.");
@@ -62,12 +56,10 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    await ensureSchema();
-    const sql = getSql();
-    const existing = await sql`SELECT employee_id, name FROM employees WHERE employee_id = ${employeeId}`;
+    const existing = await findEmployee(employeeId);
 
-    if (existing.length > 0) {
-      if (existing[0].name !== name) {
+    if (existing) {
+      if (existing.name !== name) {
         return fail("이미 등록된 사번입니다. 이름을 다시 확인해 주세요.");
       }
       // 이미 등록된 사람이 다시 요청한 경우 - 그대로 성공 처리 (중복 등록 방지)
@@ -75,10 +67,14 @@ export async function POST(req: NextRequest) {
     }
 
     const createdAt = new Date().toISOString().slice(0, 10);
-    await sql`
-      INSERT INTO employees (employee_id, name, department, current_job, position, created_at)
-      VALUES (${employeeId}, ${name}, ${department}, ${currentJob}, ${position || null}, ${createdAt})
-    `;
+    await createEmployee({
+      employee_id: employeeId,
+      name,
+      department,
+      current_job: currentJob,
+      position,
+      created_at: createdAt,
+    });
 
     return NextResponse.json({ ok: true, alreadyRegistered: false });
   } catch (err) {

@@ -1,34 +1,14 @@
 /**
  * 가상 샘플 데이터 10명을 만드는 스크립트입니다. (실제 직원 정보 아님 — 테스트/시연용)
  *
- * 실행 방법:
- *   1) Netlify에 DB를 연결한 뒤, 아래 중 하나로 NETLIFY_DATABASE_URL을 준비합니다.
- *      - `netlify dev:exec npm run db:seed` (Netlify CLI가 자동으로 값을 넣어줌)
- *      - 또는 `.env.local` 파일에 NETLIFY_DATABASE_URL=... 을 직접 적어두기
- *   2) `npm run db:seed` 실행
+ * 실행 방법 (Netlify Blobs는 사이트와 연결된 상태에서만 쓸 수 있으므로 Netlify CLI가 필요합니다):
+ *   1) npm install -g netlify-cli
+ *   2) netlify link   (이 저장소를 만든 Netlify 사이트를 선택해 연결)
+ *   3) netlify dev:exec npm run db:seed
  *
  * 이미 등록된 사번은 건너뛰므로 여러 번 실행해도 데이터가 중복되지 않습니다.
  */
-import fs from "node:fs";
-import path from "node:path";
-
-// .env.local이 있으면 직접 읽어서 process.env에 채워 넣습니다. (dotenv 패키지 없이)
-function loadEnvLocal() {
-  const envPath = path.join(process.cwd(), ".env.local");
-  if (!fs.existsSync(envPath)) return;
-  const lines = fs.readFileSync(envPath, "utf-8").split("\n");
-  for (const line of lines) {
-    const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
-    if (!match) continue;
-    const [, key, rawValue = ""] = match;
-    if (process.env[key] === undefined) {
-      process.env[key] = rawValue.replace(/^["']|["']$/g, "");
-    }
-  }
-}
-loadEnvLocal();
-
-import { ensureSchema, getSql } from "./db";
+import { createAssessment, createEmployee, findEmployee, replaceRecommendations } from "./store";
 import { COMPETENCY_NAMES } from "../config/competencies";
 import { JOB_REQUIREMENTS } from "../config/jobRequirements";
 
@@ -300,45 +280,34 @@ const SAMPLE_EMPLOYEES: SeedEmployee[] = [
 ];
 
 async function main() {
-  await ensureSchema();
-  const sql = getSql();
-
   for (const emp of SAMPLE_EMPLOYEES) {
-    const existing = await sql`SELECT employee_id FROM employees WHERE employee_id = ${emp.employee_id}`;
-    if (existing.length > 0) {
+    const existing = await findEmployee(emp.employee_id);
+    if (existing) {
       console.log(`- ${emp.employee_id} ${emp.name} 이미 존재 → 건너뜀`);
       continue;
     }
 
-    await sql`
-      INSERT INTO employees (employee_id, name, department, current_job, position, created_at)
-      VALUES (${emp.employee_id}, ${emp.name}, ${emp.department}, ${emp.current_job}, ${emp.position}, ${emp.created_at})
-    `;
+    await createEmployee({
+      employee_id: emp.employee_id,
+      name: emp.name,
+      department: emp.department,
+      current_job: emp.current_job,
+      position: emp.position,
+      created_at: emp.created_at,
+    });
 
     for (const a of emp.assessments) {
-      const inserted = await sql`
-        INSERT INTO assessments (employee_id, assessed_at, desired_job, career_goal)
-        VALUES (${emp.employee_id}, ${a.assessed_at}, ${a.desired_job}, ${a.career_goal})
-        RETURNING assessment_id
-      `;
-      const assessmentId = inserted[0].assessment_id as number;
-      const requiredLevels = JOB_REQUIREMENTS[a.desired_job];
+      const assessmentId = await createAssessment({
+        employee_id: emp.employee_id,
+        assessed_at: a.assessed_at,
+        desired_job: a.desired_job,
+        career_goal: a.career_goal,
+        scores: a.scores,
+        requiredLevels: JOB_REQUIREMENTS[a.desired_job],
+      });
 
-      for (const name of COMPETENCY_NAMES) {
-        await sql`
-          INSERT INTO competency_scores (assessment_id, competency_name, current_score, required_level)
-          VALUES (${assessmentId}, ${name}, ${a.scores[name]}, ${requiredLevels[name]})
-        `;
-      }
-
-      for (const rec of a.recommendations ?? []) {
-        await sql`
-          INSERT INTO recommendations
-            (assessment_id, category, title, search_keyword, platform, reason, stage, status, completed_at)
-          VALUES
-            (${assessmentId}, ${rec.category}, ${rec.title}, ${rec.search_keyword}, ${rec.platform},
-             ${rec.reason}, ${rec.stage}, ${rec.status}, ${rec.completed_at})
-        `;
+      if (a.recommendations?.length) {
+        await replaceRecommendations(assessmentId, a.recommendations);
       }
     }
 

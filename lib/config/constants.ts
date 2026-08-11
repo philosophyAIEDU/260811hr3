@@ -36,7 +36,7 @@ export const LEARNING_STATUSES = ["예정", "수강중", "완료"] as const;
 /** 휴넷 메인 주소 (실제 검색 주소 형식을 확인하기 전까지는 이 주소로 연결) */
 export const HUNET_HOME_URL = "https://www.hunet.co.kr";
 
-/** 관리자가 저장하는 공용 Gemini API 키의 app_settings 테이블 key 값 */
+/** 관리자가 저장하는 공용 Gemini API 키를 저장소(store.ts)에 넣을 때 쓰는 key 값 */
 export const SHARED_GEMINI_KEY_SETTING = "shared_gemini_api_key";
 
 /** 개인 Gemini API 키를 브라우저(localStorage)에 저장할 때 쓰는 키 이름 (서버에는 저장하지 않음) */

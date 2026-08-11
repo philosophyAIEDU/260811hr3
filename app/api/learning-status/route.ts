@@ -3,8 +3,8 @@
  * 완료로 바꾸면 완료일을 자동으로 기록하고, 완료에서 다른 상태로 되돌리면 완료일을 지웁니다.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { ensureSchema, getSql } from "@/lib/db/db";
 import { LEARNING_STATUSES } from "@/lib/config/constants";
+import { findEmployee, updateRecommendationStatus } from "@/lib/db/store";
 
 function fail(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
@@ -34,32 +34,18 @@ export async function PATCH(req: NextRequest) {
   }
 
   try {
-    await ensureSchema();
-    const sql = getSql();
-
-    const employeeRows = await sql`SELECT name FROM employees WHERE employee_id = ${employeeId}`;
-    if (employeeRows.length === 0 || employeeRows[0].name !== name) {
+    const employee = await findEmployee(employeeId);
+    if (!employee || employee.name !== name) {
       return fail("사번과 이름이 일치하지 않습니다. 다시 확인해 주세요.");
     }
 
-    const ownedRows = await sql`
-      SELECT r.recommendation_id FROM recommendations r
-      JOIN assessments a ON a.assessment_id = r.assessment_id
-      WHERE r.recommendation_id = ${recommendationId} AND a.employee_id = ${employeeId}
-    `;
-    if (ownedRows.length === 0) {
+    const completedAt = status === "완료" ? todayKst() : null;
+    const updated = await updateRecommendationStatus(recommendationId, employeeId, status, completedAt);
+    if (!updated) {
       return fail("해당 학습 항목을 찾을 수 없습니다.", 404);
     }
 
-    const completedAt = status === "완료" ? todayKst() : null;
-    const updated = await sql`
-      UPDATE recommendations
-      SET status = ${status}, completed_at = ${completedAt}
-      WHERE recommendation_id = ${recommendationId}
-      RETURNING recommendation_id, category, title, search_keyword, platform, reason, stage, status, completed_at
-    `;
-
-    return NextResponse.json({ ok: true, recommendation: updated[0] });
+    return NextResponse.json({ ok: true, recommendation: updated });
   } catch (err) {
     console.error("[PATCH /api/learning-status]", err);
     return fail("상태 변경 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.", 500);

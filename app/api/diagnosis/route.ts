@@ -1,12 +1,16 @@
 /**
- * 화면2(역량 자가진단)에서 제출한 진단을 저장하는 API입니다.
- * 진단 1회 제출 = assessments 1행 + competency_scores 10행(역량 개수만큼)
+ * 화면2(역량 자가진단)에서 제출한 진단을 저장하고, 화면3(내 진단 결과)에서 조회하는 API입니다.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { ensureSchema, getSql } from "@/lib/db/db";
 import { COMPETENCY_NAMES } from "@/lib/config/competencies";
 import { JOB_LIST, JOB_REQUIREMENTS } from "@/lib/config/jobRequirements";
 import { SCORE_MAX, SCORE_MIN } from "@/lib/config/constants";
+import {
+  createAssessment,
+  findEmployee,
+  getAssessmentsForEmployee,
+  getScoresForAssessment,
+} from "@/lib/db/store";
 
 function fail(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
@@ -40,58 +44,23 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    await ensureSchema();
-    const sql = getSql();
-
-    const employeeRows = await sql`
-      SELECT employee_id, name, department, current_job, position
-      FROM employees WHERE employee_id = ${employeeId}
-    `;
-    if (employeeRows.length === 0 || employeeRows[0].name !== name) {
+    const employee = await findEmployee(employeeId);
+    if (!employee || employee.name !== name) {
       return fail("사번과 이름이 일치하지 않습니다. 다시 확인해 주세요.");
     }
 
-    const rows = await sql`
-      SELECT a.assessment_id, a.assessed_at, a.desired_job, a.career_goal,
-             cs.competency_name, cs.current_score, cs.required_level
-      FROM assessments a
-      JOIN competency_scores cs ON cs.assessment_id = a.assessment_id
-      WHERE a.employee_id = ${employeeId}
-      ORDER BY a.assessment_id DESC, cs.competency_name
-    `;
+    const assessments = await getAssessmentsForEmployee(employeeId);
+    const withScores = await Promise.all(
+      assessments.map(async (a) => ({
+        assessment_id: a.assessment_id,
+        assessed_at: a.assessed_at,
+        desired_job: a.desired_job,
+        career_goal: a.career_goal,
+        scores: await getScoresForAssessment(a.assessment_id),
+      }))
+    );
 
-    type AssessmentRow = {
-      assessment_id: number;
-      assessed_at: string;
-      desired_job: string;
-      career_goal: string;
-      scores: { competency_name: string; current_score: number; required_level: number }[];
-    };
-
-    const assessmentsById = new Map<number, AssessmentRow>();
-    for (const row of rows) {
-      let assessment = assessmentsById.get(row.assessment_id);
-      if (!assessment) {
-        assessment = {
-          assessment_id: row.assessment_id,
-          assessed_at: row.assessed_at,
-          desired_job: row.desired_job,
-          career_goal: row.career_goal,
-          scores: [],
-        };
-        assessmentsById.set(row.assessment_id, assessment);
-      }
-      assessment.scores.push({
-        competency_name: row.competency_name,
-        current_score: row.current_score,
-        required_level: row.required_level,
-      });
-    }
-
-    return NextResponse.json({
-      employee: employeeRows[0],
-      assessments: Array.from(assessmentsById.values()),
-    });
+    return NextResponse.json({ employee, assessments: withScores });
   } catch (err) {
     console.error("[GET /api/diagnosis]", err);
     return fail("데이터를 불러오는 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.", 500);
@@ -129,31 +98,19 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    await ensureSchema();
-    const sql = getSql();
-
-    const employeeRows = await sql`SELECT employee_id FROM employees WHERE employee_id = ${employeeId}`;
-    if (employeeRows.length === 0) {
+    const employee = await findEmployee(employeeId);
+    if (!employee) {
       return fail("등록되지 않은 사번입니다. 시작 화면부터 다시 진행해 주세요.");
     }
 
-    const assessedAt = nowKst();
-    const inserted = await sql`
-      INSERT INTO assessments (employee_id, assessed_at, desired_job, career_goal)
-      VALUES (${employeeId}, ${assessedAt}, ${desiredJob}, ${careerGoal})
-      RETURNING assessment_id
-    `;
-    const assessmentId = inserted[0].assessment_id as number;
-
-    const requiredLevels = JOB_REQUIREMENTS[desiredJob];
-    await Promise.all(
-      COMPETENCY_NAMES.map((name) =>
-        sql`
-          INSERT INTO competency_scores (assessment_id, competency_name, current_score, required_level)
-          VALUES (${assessmentId}, ${name}, ${scores[name]}, ${requiredLevels[name]})
-        `
-      )
-    );
+    const assessmentId = await createAssessment({
+      employee_id: employeeId,
+      assessed_at: nowKst(),
+      desired_job: desiredJob,
+      career_goal: careerGoal,
+      scores,
+      requiredLevels: JOB_REQUIREMENTS[desiredJob],
+    });
 
     return NextResponse.json({ ok: true, assessment_id: assessmentId });
   } catch (err) {

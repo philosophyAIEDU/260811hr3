@@ -5,9 +5,9 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
-import { ensureSchema, getSql } from "@/lib/db/db";
 import { ADMIN_CODE } from "@/lib/config/constants";
 import { COMPETENCY_NAMES } from "@/lib/config/competencies";
+import { getAllData } from "@/lib/db/store";
 
 export async function POST(req: NextRequest) {
   let body: Record<string, unknown>;
@@ -23,31 +23,21 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    await ensureSchema();
-    const sql = getSql();
+    const data = await getAllData();
 
-    const employees = await sql`
-      SELECT employee_id, name, department, position, current_job, created_at
-      FROM employees ORDER BY employee_id
-    `;
-
-    const latestAssessments = await sql`
-      SELECT DISTINCT ON (employee_id) assessment_id, employee_id, assessed_at, desired_job, career_goal
-      FROM assessments
-      ORDER BY employee_id, assessment_id DESC
-    `;
-    const assessmentIds = latestAssessments.map((a) => a.assessment_id as number);
-
-    const scores = assessmentIds.length
-      ? await sql`
-          SELECT assessment_id, competency_name, current_score
-          FROM competency_scores WHERE assessment_id = ANY(${assessmentIds})
-        `
-      : [];
+    // 직원별 가장 최근 진단 회차
+    const latestByEmployee = new Map<string, number>();
+    for (const a of data.assessments) {
+      const current = latestByEmployee.get(a.employee_id);
+      if (!current || a.assessment_id > current) {
+        latestByEmployee.set(a.employee_id, a.assessment_id);
+      }
+    }
 
     // 시트1: 직원별 최신 진단 요약
-    const summaryRows = employees.map((e) => {
-      const latest = latestAssessments.find((a) => a.employee_id === e.employee_id);
+    const summaryRows = data.employees.map((e) => {
+      const latestId = latestByEmployee.get(e.employee_id);
+      const latest = latestId ? data.assessments.find((a) => a.assessment_id === latestId) : undefined;
       const row: Record<string, string | number> = {
         사번: e.employee_id,
         이름: e.name,
@@ -61,49 +51,36 @@ export async function POST(req: NextRequest) {
       };
       for (const name of COMPETENCY_NAMES) {
         const s = latest
-          ? scores.find((sc) => sc.assessment_id === latest.assessment_id && sc.competency_name === name)
+          ? data.scores.find((sc) => sc.assessment_id === latest.assessment_id && sc.competency_name === name)
           : undefined;
-        row[name] = s ? (s.current_score as number) : "";
+        row[name] = s ? s.current_score : "";
       }
       return row;
     });
 
-    // 시트2: 추천 및 학습 현황
-    const recRows = assessmentIds.length
-      ? await sql`
-          SELECT a.employee_id, r.category, r.title, r.platform, r.stage, r.status, r.completed_at
-          FROM recommendations r
-          JOIN assessments a ON a.assessment_id = r.assessment_id
-          WHERE r.assessment_id = ANY(${assessmentIds})
-          ORDER BY a.employee_id, r.recommendation_id
-        `
-      : [];
-    const learningRows = recRows.map((r) => {
-      const emp = employees.find((e) => e.employee_id === r.employee_id);
-      return {
-        사번: r.employee_id,
-        이름: emp?.name ?? "",
-        부서: emp?.department ?? "",
-        구분: r.category,
-        제목: r.title,
-        플랫폼: r.platform ?? "",
-        단계: r.stage,
-        상태: r.status,
-        완료일: r.completed_at ?? "",
-      };
-    });
+    // 시트2: 추천 및 학습 현황 (모든 직원의 가장 최근 진단 기준)
+    const latestAssessmentIds = new Set(latestByEmployee.values());
+    const learningRows = data.recommendations
+      .filter((r) => latestAssessmentIds.has(r.assessment_id))
+      .map((r) => {
+        const assessment = data.assessments.find((a) => a.assessment_id === r.assessment_id);
+        const emp = assessment ? data.employees.find((e) => e.employee_id === assessment.employee_id) : undefined;
+        return {
+          사번: emp?.employee_id ?? "",
+          이름: emp?.name ?? "",
+          부서: emp?.department ?? "",
+          구분: r.category,
+          제목: r.title,
+          플랫폼: r.platform ?? "",
+          단계: r.stage,
+          상태: r.status,
+          완료일: r.completed_at ?? "",
+        };
+      });
 
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(
-      workbook,
-      XLSX.utils.json_to_sheet(summaryRows),
-      "직원별 최신진단"
-    );
-    XLSX.utils.book_append_sheet(
-      workbook,
-      XLSX.utils.json_to_sheet(learningRows),
-      "추천 및 학습현황"
-    );
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(summaryRows), "직원별 최신진단");
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(learningRows), "추천 및 학습현황");
 
     const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }) as Buffer;
     const fileName = `growthpath_${new Date().toISOString().slice(0, 10)}.xlsx`;
