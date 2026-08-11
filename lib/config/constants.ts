@@ -14,14 +14,6 @@ export const GEMINI_MODEL = "gemini-3.5-flash-lite";
  */
 export const ADMIN_CODE = process.env.ADMIN_CODE || "1234";
 
-/**
- * 사이트 전체 진입 코드입니다. Netlify에 올리면 누구나 주소만 알면 들어올 수 있어
- * 최소한의 보호로 추가했습니다. (요청서 원안에는 없던 항목이며,
- * "사내망 로컬 전용" 전제와 배치되어 배포 결정에 따라 보완 차원에서 넣었습니다)
- * Netlify 환경변수 SITE_ACCESS_CODE로 값을 바꿀 수 있습니다.
- */
-export const SITE_ACCESS_CODE = process.env.SITE_ACCESS_CODE || "hunet2026";
-
 /** 역량 점수 척도 범위 (1=거의 못함 ~ 5=매우 잘함) */
 export const SCORE_MIN = 1;
 export const SCORE_MAX = 5;
