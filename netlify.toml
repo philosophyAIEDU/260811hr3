@@ -1,0 +1,6 @@
+# Netlify 배포 설정 파일입니다. Next.js는 Netlify 공식 플러그인이 자동으로 처리합니다.
+[build]
+  command = "npm run build"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

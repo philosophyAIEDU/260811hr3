@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 스마트폰 브라우저에서도 화면이 깨지지 않도록 기본 여백/줄바꿈을 조정합니다 */
+html,
+body {
+  overflow-x: hidden;
+}

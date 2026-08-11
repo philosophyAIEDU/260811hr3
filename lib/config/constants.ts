@@ -8,10 +8,19 @@ export const GEMINI_MODEL = "gemini-3.5-flash-lite";
 
 /**
  * HR 관리자 화면(/admin) 입장 코드입니다.
- * 기본값은 1234이며, 바꾸고 싶으면 아래 문자열만 원하는 4자리 숫자로 수정한 뒤
- * 앱을 다시 시작하면 됩니다. (실행방법.md에도 동일한 안내가 포함됩니다)
+ * 기본값은 1234입니다. Netlify에 배포한 뒤 바꾸고 싶으면 코드를 고칠 필요 없이
+ * Netlify 사이트 설정(Site configuration → Environment variables)에서
+ * ADMIN_CODE 값을 새로 등록하면 됩니다. (등록 후 재배포하면 반영됩니다)
  */
-export const ADMIN_CODE = "1234";
+export const ADMIN_CODE = process.env.ADMIN_CODE || "1234";
+
+/**
+ * 사이트 전체 진입 코드입니다. Netlify에 올리면 누구나 주소만 알면 들어올 수 있어
+ * 최소한의 보호로 추가했습니다. (요청서 원안에는 없던 항목이며,
+ * "사내망 로컬 전용" 전제와 배치되어 배포 결정에 따라 보완 차원에서 넣었습니다)
+ * Netlify 환경변수 SITE_ACCESS_CODE로 값을 바꿀 수 있습니다.
+ */
+export const SITE_ACCESS_CODE = process.env.SITE_ACCESS_CODE || "hunet2026";
 
 /** 역량 점수 척도 범위 (1=거의 못함 ~ 5=매우 잘함) */
 export const SCORE_MIN = 1;
