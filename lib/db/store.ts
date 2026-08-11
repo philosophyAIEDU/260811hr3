@@ -179,6 +179,43 @@ export async function createEmployee(input: EmployeeRecord): Promise<void> {
   await writeData(data);
 }
 
+/**
+ * 사용자를 등록하거나, 이미 있으면 입력한 항목만 갱신합니다.
+ * 이름·부서·현재직무는 모두 선택 입력이라, 비워서 보내면 기존 값을 지우지 않고 그대로 둡니다.
+ * (사번·이름 없이 바로 쓸 수 있어야 하므로, 아무것도 입력하지 않아도 등록이 됩니다)
+ */
+export async function upsertEmployee(input: {
+  employee_id: string;
+  name?: string;
+  department?: string;
+  current_job?: string;
+  position?: string;
+}): Promise<EmployeeRecord> {
+  const data = await readData();
+  const existing = data.employees.find((e) => e.employee_id === input.employee_id);
+
+  if (existing) {
+    if (input.name) existing.name = input.name;
+    if (input.department) existing.department = input.department;
+    if (input.current_job) existing.current_job = input.current_job;
+    if (input.position) existing.position = input.position;
+    await writeData(data);
+    return existing;
+  }
+
+  const created: EmployeeRecord = {
+    employee_id: input.employee_id,
+    name: input.name ?? "",
+    department: input.department ?? "",
+    current_job: input.current_job ?? "",
+    position: input.position ?? "",
+    created_at: new Date().toISOString().slice(0, 10),
+  };
+  data.employees.push(created);
+  await writeData(data);
+  return created;
+}
+
 // ── 진단회차 · 역량점수 ──────────────────────────────────
 
 export async function createAssessment(input: {

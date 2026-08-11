@@ -1,5 +1,8 @@
 /**
  * 화면2(역량 자가진단)에서 제출한 진단을 저장하고, 화면3(내 진단 결과)에서 조회하는 API입니다.
+ *
+ * 사번·이름을 입력받지 않습니다. 브라우저가 자동으로 만든 무작위 식별자(user_id)로
+ * 본인 데이터를 구분하며, 처음 진단을 제출하는 사람은 이때 자동으로 등록됩니다.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { COMPETENCY_NAMES } from "@/lib/config/competencies";
@@ -10,6 +13,7 @@ import {
   findEmployee,
   getAssessmentsForEmployee,
   getScoresForAssessment,
+  upsertEmployee,
 } from "@/lib/db/store";
 
 // 이 API는 항상 최신 데이터를 읽어야 하므로 Next.js가 응답을 저장해두지 않도록 합니다.
@@ -36,23 +40,18 @@ function nowKst(): string {
 
 /**
  * 화면3(내 진단 결과)에서 사용하는 조회 API입니다.
- * 사번+이름이 일치해야 조회되며, 그 직원의 모든 진단 이력과 역량점수를 최신순으로 돌려줍니다.
+ * 무작위 식별자가 곧 본인 확인 수단이므로, 그 식별자에 해당하는 데이터만 돌려줍니다.
  */
 export async function GET(req: NextRequest) {
-  const employeeId = req.nextUrl.searchParams.get("employee_id")?.trim();
-  const name = req.nextUrl.searchParams.get("name")?.trim();
+  const userId = req.nextUrl.searchParams.get("user_id")?.trim();
 
-  if (!employeeId || !name) {
-    return fail("사번과 이름을 모두 입력해 주세요.");
+  if (!userId) {
+    return fail("사용자 정보가 없습니다. 시작 화면부터 다시 진행해 주세요.");
   }
 
   try {
-    const employee = await findEmployee(employeeId);
-    if (!employee || employee.name !== name) {
-      return fail("사번과 이름이 일치하지 않습니다. 다시 확인해 주세요.");
-    }
-
-    const assessments = await getAssessmentsForEmployee(employeeId);
+    const employee = await findEmployee(userId);
+    const assessments = await getAssessmentsForEmployee(userId);
     const withScores = await Promise.all(
       assessments.map(async (a) => ({
         assessment_id: a.assessment_id,
@@ -78,36 +77,44 @@ export async function POST(req: NextRequest) {
     return fail("요청 형식이 올바르지 않습니다.");
   }
 
-  const employeeId = String(body.employee_id ?? "").trim();
+  const userId = String(body.user_id ?? "").trim();
   const desiredJob = String(body.desired_job ?? "").trim();
   const careerGoal = String(body.career_goal ?? "").trim();
   const scores = body.scores as Record<string, number> | undefined;
 
-  if (!employeeId) return fail("사번 정보가 없습니다. 시작 화면부터 다시 진행해 주세요.");
+  // 아래 셋은 모두 선택 입력입니다. 비워두어도 진단이 정상 저장됩니다.
+  const name = String(body.name ?? "").trim();
+  const department = String(body.department ?? "").trim();
+  const currentJob = String(body.current_job ?? "").trim();
+
+  if (!userId) return fail("사용자 정보가 없습니다. 시작 화면부터 다시 진행해 주세요.");
   if (!JOB_LIST.includes(desiredJob)) return fail("희망직무를 선택해 주세요.");
   if (!careerGoal) return fail("커리어 목표를 입력해 주세요.");
   if (!scores || typeof scores !== "object") return fail("역량 점수를 입력해 주세요.");
 
-  for (const name of COMPETENCY_NAMES) {
-    const score = scores[name];
+  for (const competencyName of COMPETENCY_NAMES) {
+    const score = scores[competencyName];
     if (
       typeof score !== "number" ||
       !Number.isInteger(score) ||
       score < SCORE_MIN ||
       score > SCORE_MAX
     ) {
-      return fail(`"${name}" 역량 점수를 ${SCORE_MIN}~${SCORE_MAX} 사이로 선택해 주세요.`);
+      return fail(`"${competencyName}" 역량 점수를 ${SCORE_MIN}~${SCORE_MAX} 사이로 선택해 주세요.`);
     }
   }
 
   try {
-    const employee = await findEmployee(employeeId);
-    if (!employee) {
-      return fail("등록되지 않은 사번입니다. 시작 화면부터 다시 진행해 주세요.");
-    }
+    // 처음 진단하는 사람이면 여기서 자동으로 등록되고, 이미 있으면 입력한 항목만 갱신됩니다.
+    await upsertEmployee({
+      employee_id: userId,
+      name,
+      department,
+      current_job: currentJob,
+    });
 
     const assessmentId = await createAssessment({
-      employee_id: employeeId,
+      employee_id: userId,
       assessed_at: nowKst(),
       desired_job: desiredJob,
       career_goal: careerGoal,

@@ -10,7 +10,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { COMPETENCIES } from "@/lib/config/competencies";
 import { GAP_ALERT_THRESHOLD, SCORE_MAX } from "@/lib/config/constants";
-import { getSessionEmployee, type SessionEmployee } from "@/lib/session";
+import { getDisplayName, getExistingUserId } from "@/lib/session";
 
 interface CompetencyScore {
   competency_name: string;
@@ -28,23 +28,23 @@ interface Assessment {
 
 export default function ResultPage() {
   const router = useRouter();
-  const [employee, setEmployee] = useState<SessionEmployee | null>(null);
+  const [displayName, setDisplayName] = useState("");
   const [assessments, setAssessments] = useState<Assessment[] | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const emp = getSessionEmployee();
-    if (!emp) {
+    const userId = getExistingUserId();
+    if (!userId) {
       router.replace("/");
       return;
     }
-    setEmployee(emp);
+    setDisplayName(getDisplayName());
 
     (async () => {
       try {
-        const params = new URLSearchParams({ employee_id: emp.employee_id, name: emp.name });
+        const params = new URLSearchParams({ user_id: userId });
         const res = await fetch(`/api/diagnosis?${params.toString()}`);
         const data = await res.json();
 
@@ -105,7 +105,7 @@ export default function ResultPage() {
       <div>
         <h1 className="mb-1 text-xl font-bold">내 진단 결과</h1>
         <p className="text-sm text-gray-500">
-          <strong>{employee?.name}</strong>님의 역량 진단 결과입니다.
+          {displayName ? `${displayName}님의 ` : ""}역량 진단 결과입니다.
         </p>
       </div>
 

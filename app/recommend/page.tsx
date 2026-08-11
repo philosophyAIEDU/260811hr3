@@ -10,7 +10,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ROADMAP_STAGES } from "@/lib/config/constants";
 import { getPersonalGeminiKey } from "@/lib/personalKey";
-import { getSessionEmployee, type SessionEmployee } from "@/lib/session";
+import { getDisplayName, getExistingUserId } from "@/lib/session";
 
 interface Recommendation {
   recommendation_id: number;
@@ -25,7 +25,8 @@ interface Recommendation {
 
 export default function RecommendPage() {
   const router = useRouter();
-  const [employee, setEmployee] = useState<SessionEmployee | null>(null);
+  const [userId, setUserId] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [assessmentId, setAssessmentId] = useState<number | null>(null);
   const [desiredJob, setDesiredJob] = useState("");
   const [recommendations, setRecommendations] = useState<Recommendation[] | null>(null);
@@ -35,21 +36,22 @@ export default function RecommendPage() {
   const [copiedId, setCopiedId] = useState<number | null>(null);
 
   useEffect(() => {
-    const emp = getSessionEmployee();
-    if (!emp) {
+    const id = getExistingUserId();
+    if (!id) {
       router.replace("/");
       return;
     }
-    setEmployee(emp);
-    loadExisting(emp);
+    setUserId(id);
+    setDisplayName(getDisplayName());
+    loadExisting(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
-  async function loadExisting(emp: SessionEmployee) {
+  async function loadExisting(id: string) {
     setLoading(true);
     setError("");
     try {
-      const params = new URLSearchParams({ employee_id: emp.employee_id, name: emp.name });
+      const params = new URLSearchParams({ user_id: id });
       const res = await fetch(`/api/recommend?${params.toString()}`);
       const data = await res.json();
       if (!res.ok) {
@@ -67,7 +69,7 @@ export default function RecommendPage() {
   }
 
   async function handleGenerate() {
-    if (!employee) return;
+    if (!userId) return;
     setError("");
     setGenerating(true);
     try {
@@ -75,8 +77,7 @@ export default function RecommendPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          employee_id: employee.employee_id,
-          name: employee.name,
+          user_id: userId,
           assessment_id: assessmentId,
           personal_api_key: getPersonalGeminiKey(),
         }),
@@ -114,8 +115,8 @@ export default function RecommendPage() {
       <div>
         <h1 className="mb-1 text-xl font-bold">AI 맞춤 추천 · 성장 로드맵</h1>
         <p className="text-sm text-gray-500">
-          <strong>{employee?.name}</strong>님의 희망직무({desiredJob || "-"}) 진단 결과를 바탕으로
-          만든 추천입니다.
+          {displayName ? `${displayName}님의 ` : ""}희망직무({desiredJob || "-"}) 진단 결과를
+          바탕으로 만든 추천입니다.
         </p>
       </div>
 

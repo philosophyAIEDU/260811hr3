@@ -44,7 +44,8 @@ export async function GET(req: NextRequest) {
       if (!latestAssessmentIds.has(score.assessment_id)) continue;
       const assessment = data.assessments.find((a) => a.assessment_id === score.assessment_id);
       if (!assessment) continue;
-      const department = departmentOf.get(assessment.employee_id) ?? "미분류";
+      // 부서는 선택 입력이라 비어 있을 수 있습니다. 그런 경우 "미입력"으로 묶어서 보여줍니다.
+      const department = departmentOf.get(assessment.employee_id)?.trim() || "미입력";
 
       const deptEntry =
         deptTotals.get(department) ?? { sum: 0, count: 0, employees: new Set<string>() };

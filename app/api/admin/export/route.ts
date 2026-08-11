@@ -39,11 +39,11 @@ export async function POST(req: NextRequest) {
       const latestId = latestByEmployee.get(e.employee_id);
       const latest = latestId ? data.assessments.find((a) => a.assessment_id === latestId) : undefined;
       const row: Record<string, string | number> = {
-        사번: e.employee_id,
-        이름: e.name,
-        부서: e.department,
+        식별번호: e.employee_id,
+        이름: e.name || "(이름 미입력)",
+        부서: e.department || "미입력",
         직급: e.position ?? "",
-        현재직무: e.current_job,
+        현재직무: e.current_job || "미입력",
         등록일: e.created_at,
         희망직무: latest?.desired_job ?? "",
         최근진단일시: latest?.assessed_at ?? "",
@@ -66,9 +66,9 @@ export async function POST(req: NextRequest) {
         const assessment = data.assessments.find((a) => a.assessment_id === r.assessment_id);
         const emp = assessment ? data.employees.find((e) => e.employee_id === assessment.employee_id) : undefined;
         return {
-          사번: emp?.employee_id ?? "",
-          이름: emp?.name ?? "",
-          부서: emp?.department ?? "",
+          식별번호: emp?.employee_id ?? "",
+          이름: emp?.name || "(이름 미입력)",
+          부서: emp?.department || "미입력",
           구분: r.category,
           제목: r.title,
           플랫폼: r.platform ?? "",

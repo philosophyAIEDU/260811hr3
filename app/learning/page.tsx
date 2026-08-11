@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LEARNING_STATUSES, RECOMMEND_COMPLETE_BANNER_THRESHOLD } from "@/lib/config/constants";
-import { getSessionEmployee, type SessionEmployee } from "@/lib/session";
+import { getDisplayName, getExistingUserId } from "@/lib/session";
 
 interface Recommendation {
   recommendation_id: number;
@@ -25,28 +25,30 @@ interface Recommendation {
 
 export default function LearningPage() {
   const router = useRouter();
-  const [employee, setEmployee] = useState<SessionEmployee | null>(null);
+  const [userId, setUserId] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [items, setItems] = useState<Recommendation[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [updatingId, setUpdatingId] = useState<number | null>(null);
 
   useEffect(() => {
-    const emp = getSessionEmployee();
-    if (!emp) {
+    const id = getExistingUserId();
+    if (!id) {
       router.replace("/");
       return;
     }
-    setEmployee(emp);
-    load(emp);
+    setUserId(id);
+    setDisplayName(getDisplayName());
+    load(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
-  async function load(emp: SessionEmployee) {
+  async function load(id: string) {
     setLoading(true);
     setError("");
     try {
-      const params = new URLSearchParams({ employee_id: emp.employee_id, name: emp.name });
+      const params = new URLSearchParams({ user_id: id });
       const res = await fetch(`/api/recommend?${params.toString()}`);
       const data = await res.json();
       if (!res.ok) {
@@ -62,15 +64,14 @@ export default function LearningPage() {
   }
 
   async function handleStatusChange(rec: Recommendation, status: string) {
-    if (!employee) return;
+    if (!userId) return;
     setUpdatingId(rec.recommendation_id);
     try {
       const res = await fetch("/api/learning-status", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          employee_id: employee.employee_id,
-          name: employee.name,
+          user_id: userId,
           recommendation_id: rec.recommendation_id,
           status,
         }),
@@ -122,7 +123,7 @@ export default function LearningPage() {
       <div>
         <h1 className="mb-1 text-xl font-bold">내 학습 현황</h1>
         <p className="text-sm text-gray-500">
-          <strong>{employee?.name}</strong>님, 학습을 진행하면서 상태를 바꿔 주세요.
+          {displayName ? `${displayName}님, ` : ""}학습을 진행하면서 상태를 바꿔 주세요.
         </p>
       </div>
 

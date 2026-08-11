@@ -140,7 +140,7 @@ export default function AdminPage() {
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <div className="rounded-lg border bg-white p-4 text-center shadow-sm">
-          <p className="text-xs text-gray-500">등록 직원</p>
+          <p className="text-xs text-gray-500">참여자</p>
           <p className="text-2xl font-bold">{stats.totalEmployees}명</p>
         </div>
         <div className="rounded-lg border bg-white p-4 text-center shadow-sm">
@@ -148,7 +148,7 @@ export default function AdminPage() {
           <p className="text-2xl font-bold">{stats.diagnosedEmployees}명</p>
         </div>
         <div className="rounded-lg border bg-white p-4 text-center shadow-sm">
-          <p className="text-xs text-gray-500">진단 참여율</p>
+          <p className="text-xs text-gray-500">진단 완료율</p>
           <p className="text-2xl font-bold">{participationRate}%</p>
         </div>
       </div>

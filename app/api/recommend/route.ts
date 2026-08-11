@@ -27,23 +27,22 @@ function fail(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
-/** 사번+이름을 확인하고, 조회 대상 진단 회차(지정 없으면 최신)를 찾습니다. */
+/**
+ * 조회 대상 진단 회차(지정 없으면 최신)를 찾습니다.
+ * 사번·이름을 쓰지 않고, 브라우저가 자동 발급한 무작위 식별자로 본인 데이터만 찾습니다.
+ */
 async function resolveAssessment(
-  employeeId: string,
-  name: string,
+  userId: string,
   assessmentId: number | null
 ): Promise<
-  | { ok: true; employee: EmployeeRecord; assessment: AssessmentRecord }
+  | { ok: true; employee: EmployeeRecord | null; assessment: AssessmentRecord }
   | { ok: false; error: string }
 > {
-  const employee = await findEmployee(employeeId);
-  if (!employee || employee.name !== name) {
-    return { ok: false, error: "사번과 이름이 일치하지 않습니다. 다시 확인해 주세요." };
-  }
+  const employee = await findEmployee(userId);
 
   const assessment = assessmentId
-    ? await getAssessmentById(assessmentId, employeeId)
-    : await getLatestAssessment(employeeId);
+    ? await getAssessmentById(assessmentId, userId)
+    : await getLatestAssessment(userId);
 
   if (!assessment) {
     return { ok: false, error: "진단 이력이 없습니다. 역량 자가진단을 먼저 진행해 주세요." };
@@ -53,15 +52,14 @@ async function resolveAssessment(
 }
 
 export async function GET(req: NextRequest) {
-  const employeeId = req.nextUrl.searchParams.get("employee_id")?.trim();
-  const name = req.nextUrl.searchParams.get("name")?.trim();
+  const userId = req.nextUrl.searchParams.get("user_id")?.trim();
   const assessmentIdParam = req.nextUrl.searchParams.get("assessment_id");
   const assessmentId = assessmentIdParam ? Number(assessmentIdParam) : null;
 
-  if (!employeeId || !name) return fail("사번과 이름을 모두 입력해 주세요.");
+  if (!userId) return fail("사용자 정보가 없습니다. 시작 화면부터 다시 진행해 주세요.");
 
   try {
-    const resolved = await resolveAssessment(employeeId, name, assessmentId);
+    const resolved = await resolveAssessment(userId, assessmentId);
     if (!resolved.ok) return fail(resolved.error);
 
     const recommendations = await getRecommendationsForAssessment(resolved.assessment.assessment_id);
@@ -86,15 +84,14 @@ export async function POST(req: NextRequest) {
     return fail("요청 형식이 올바르지 않습니다.");
   }
 
-  const employeeId = String(body.employee_id ?? "").trim();
-  const name = String(body.name ?? "").trim();
+  const userId = String(body.user_id ?? "").trim();
   const assessmentId = body.assessment_id ? Number(body.assessment_id) : null;
   const personalApiKey = String(body.personal_api_key ?? "").trim();
 
-  if (!employeeId || !name) return fail("사번과 이름을 모두 입력해 주세요.");
+  if (!userId) return fail("사용자 정보가 없습니다. 시작 화면부터 다시 진행해 주세요.");
 
   try {
-    const resolved = await resolveAssessment(employeeId, name, assessmentId);
+    const resolved = await resolveAssessment(userId, assessmentId);
     if (!resolved.ok) return fail(resolved.error);
 
     let apiKey = personalApiKey;
@@ -117,7 +114,7 @@ export async function POST(req: NextRequest) {
 
     const prompt = buildRecommendPrompt({
       desired_job: resolved.assessment.desired_job,
-      current_job: resolved.employee.current_job,
+      current_job: resolved.employee?.current_job ?? "",
       career_goal: resolved.assessment.career_goal,
       gaps,
     });
