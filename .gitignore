@@ -22,3 +22,6 @@ Thumbs.db
 .vscode/
 .idea/
 tsconfig.tsbuildinfo
+
+# 로컬에서 npm run dev로 실행할 때 생기는 데이터 파일 (실제 배포에는 쓰이지 않음)
+.data/

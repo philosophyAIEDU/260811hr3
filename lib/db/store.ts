@@ -12,9 +12,49 @@
  * 정식 데이터베이스(Netlify DB 등)로 옮기는 것을 권장합니다.
  */
 import { getStore } from "@netlify/blobs";
+import fs from "node:fs/promises";
+import path from "node:path";
 
 const STORE_NAME = "growthpath";
 const BLOB_KEY = "data";
+
+/** 로컬(내 컴퓨터)에서 실행할 때 데이터를 담아두는 파일 위치입니다. git에는 올라가지 않습니다. */
+const LOCAL_FILE = path.join(process.cwd(), ".data", "growthpath.json");
+
+type Backend =
+  | { kind: "blobs"; store: ReturnType<typeof getStore> }
+  | { kind: "file" };
+
+let backend: Backend | null = null;
+
+/**
+ * 어디에 저장할지 정합니다. (앱이 뜬 뒤 처음 한 번만 판단하고 그 뒤로는 재사용)
+ *
+ * - **Netlify에 배포된 상태** → Netlify Blobs에 저장합니다.
+ *   (사이트에 아무 연결 설정을 하지 않아도, 배포만 하면 바로 동작합니다)
+ * - **내 컴퓨터에서 npm run dev** → `.data/growthpath.json` 파일에 저장합니다.
+ *   (Netlify 없이도 전체 기능을 테스트할 수 있게 하기 위함입니다. 이 파일은 git에 올라가지 않습니다)
+ *
+ * 판단 기준으로 환경변수를 짐작하지 않고, 실제로 Blobs를 쓸 수 있는지 직접 시도해 봅니다.
+ * Blobs를 쓸 수 없는 환경에서 getStore()는 그 자리에서 오류를 내기 때문에,
+ * "오류가 났다 = Netlify 밖이다"로 확실하게 구분할 수 있습니다.
+ * 이렇게 하면 Netlify 위에서 실수로 파일에 저장해(=배포 때마다 데이터가 날아가) 버리는 일이 없습니다.
+ */
+function resolveBackend(): Backend {
+  if (backend) return backend;
+
+  try {
+    const store = getStore({ name: STORE_NAME });
+    backend = { kind: "blobs", store };
+  } catch {
+    backend = { kind: "file" };
+  }
+
+  return backend;
+}
+
+/** 강한 일관성 읽기를 쓸 수 없는 환경으로 확인되면 true가 되어, 이후로는 시도하지 않습니다. */
+let strongReadUnavailable = false;
 
 export interface EmployeeRecord {
   employee_id: string;
@@ -53,7 +93,7 @@ export interface RecommendationRecord {
   completed_at: string | null;
 }
 
-interface StoreShape {
+export interface StoreShape {
   employees: EmployeeRecord[];
   assessments: AssessmentRecord[];
   scores: ScoreRecord[];
@@ -75,17 +115,55 @@ function emptyData(): StoreShape {
   };
 }
 
-function blobStore() {
-  return getStore(STORE_NAME);
-}
-
 async function readData(): Promise<StoreShape> {
-  const data = await blobStore().get(BLOB_KEY, { type: "json" });
-  return (data as StoreShape | null) ?? emptyData();
+  const target = resolveBackend();
+
+  if (target.kind === "blobs") {
+    /**
+     * 되도록 "강한 일관성(strong)"으로 읽습니다.
+     * 이렇게 읽지 않으면 방금 저장한 내용이 잠시 동안 안 보일 수 있어서,
+     * 진단을 제출하고 결과 화면으로 넘어갔을 때 방금 낸 결과가 비어 보일 수 있습니다.
+     *
+     * 다만 일부 실행 환경에서는 강한 일관성 읽기를 아예 지원하지 않고 오류를 냅니다.
+     * 그 경우에는 앱 전체가 멈추는 대신, 일반 읽기로 한 단계 낮춰서 계속 동작하게 합니다.
+     * (아주 잠깐 최신 내용이 늦게 보일 수는 있지만, 화면이 오류로 죽지는 않습니다)
+     */
+    if (!strongReadUnavailable) {
+      try {
+        const data = await target.store.get(BLOB_KEY, { type: "json", consistency: "strong" });
+        return (data as StoreShape | null) ?? emptyData();
+      } catch (err) {
+        strongReadUnavailable = true;
+        console.warn(
+          "[store] 강한 일관성 읽기를 쓸 수 없어 일반 읽기로 전환합니다.",
+          err instanceof Error ? err.message : err
+        );
+      }
+    }
+
+    const data = await target.store.get(BLOB_KEY, { type: "json" });
+    return (data as StoreShape | null) ?? emptyData();
+  }
+
+  try {
+    const text = await fs.readFile(LOCAL_FILE, "utf-8");
+    return JSON.parse(text) as StoreShape;
+  } catch {
+    // 파일이 아직 없으면(=처음 실행) 빈 데이터로 시작합니다.
+    return emptyData();
+  }
 }
 
 async function writeData(data: StoreShape): Promise<void> {
-  await blobStore().setJSON(BLOB_KEY, data);
+  const target = resolveBackend();
+
+  if (target.kind === "blobs") {
+    await target.store.setJSON(BLOB_KEY, data);
+    return;
+  }
+
+  await fs.mkdir(path.dirname(LOCAL_FILE), { recursive: true });
+  await fs.writeFile(LOCAL_FILE, JSON.stringify(data, null, 2), "utf-8");
 }
 
 // ── 직원 ──────────────────────────────────────────────

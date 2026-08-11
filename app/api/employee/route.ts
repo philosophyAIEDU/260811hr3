@@ -6,6 +6,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createEmployee, findEmployee } from "@/lib/db/store";
 
+// 이 API는 항상 최신 데이터를 읽어야 하므로 Next.js가 응답을 저장해두지 않도록 합니다.
+export const dynamic = "force-dynamic";
+
 function fail(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
