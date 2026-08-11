@@ -52,6 +52,10 @@ export default function DiagnosisPage() {
     setName(getDisplayName());
   }, []);
 
+  // 필수 항목이 얼마나 채워졌는지 (희망직무 + 커리어목표 = 2개)
+  const filledRequired = (desiredJob ? 1 : 0) + (careerGoal.trim() ? 1 : 0);
+  const progress = Math.round((filledRequired / 2) * 100);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -97,130 +101,184 @@ export default function DiagnosisPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <h1 className="mb-1 text-xl font-bold">역량 자가진단</h1>
-      <p className="mb-6 text-sm text-gray-500">
-        아래 항목을 솔직하게 체크해 주세요. 나만의 성장 로드맵을 만드는 데 사용됩니다.
-      </p>
+    <div className="mx-auto max-w-3xl">
+      <div className="mb-6">
+        <h1 className="text-2xl font-extrabold text-navy">역량 자가진단</h1>
+        <p className="mt-1.5 text-sm text-gray-500">
+          솔직하게 체크해 주세요. 나만의 성장 로드맵을 만드는 데 사용됩니다.
+        </p>
+      </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="rounded-lg border bg-white p-5 shadow-sm">
-          <label className="mb-1 block text-sm font-medium">
-            희망직무 <span className="text-red-500">*</span>
-          </label>
-          <select
-            value={desiredJob}
-            onChange={(e) => setDesiredJob(e.target.value)}
-            className="w-full rounded border px-3 py-2 text-sm"
-          >
-            <option value="">선택해 주세요</option>
-            {JOB_LIST.map((job) => (
-              <option key={job} value={job}>
-                {job}
-              </option>
-            ))}
-          </select>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {/* 1단계: 목표 설정 */}
+        <section className="gp-card overflow-hidden">
+          <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50/70 px-6 py-3.5">
+            <h2 className="gp-section-title">
+              <span className="mr-2 text-brand">1</span>어떤 방향으로 성장하고 싶으신가요?
+            </h2>
+            <div className="hidden items-center gap-2 sm:flex">
+              <div className="h-1.5 w-20 overflow-hidden rounded-full bg-gray-200">
+                <div
+                  className="h-full rounded-full bg-brand transition-all duration-300"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              <span className="text-xs font-medium text-gray-400">{progress}%</span>
+            </div>
+          </div>
 
-          <label className="mb-1 mt-4 block text-sm font-medium">
-            커리어 목표 <span className="text-red-500">*</span>
-          </label>
-          <textarea
-            value={careerGoal}
-            onChange={(e) => setCareerGoal(e.target.value)}
-            placeholder="예: 3년 내 마케팅 전문가로 성장해 캠페인을 직접 기획하고 싶습니다."
-            rows={3}
-            className="w-full rounded border px-3 py-2 text-sm"
-          />
-        </div>
+          <div className="space-y-4 p-6">
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-navy">
+                희망직무 <span className="text-brand">*</span>
+              </label>
+              <select
+                value={desiredJob}
+                onChange={(e) => setDesiredJob(e.target.value)}
+                className="gp-input"
+              >
+                <option value="">선택해 주세요</option>
+                {JOB_LIST.map((job) => (
+                  <option key={job} value={job}>
+                    {job}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        <div className="rounded-lg border bg-white p-5 shadow-sm">
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-navy">
+                커리어 목표 <span className="text-brand">*</span>
+              </label>
+              <textarea
+                value={careerGoal}
+                onChange={(e) => setCareerGoal(e.target.value)}
+                placeholder="예: 3년 내 마케팅 전문가로 성장해 캠페인을 직접 기획하고 싶습니다."
+                rows={3}
+                className="gp-input resize-none"
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* 선택 입력 */}
+        <section className="gp-card overflow-hidden">
           <button
             type="button"
             onClick={() => setShowOptional((v) => !v)}
-            className="flex w-full items-center justify-between text-left"
+            className="flex w-full items-center justify-between px-6 py-4 text-left transition hover:bg-gray-50/70"
           >
-            <span className="text-sm font-medium">
-              이름 · 부서 · 현재직무 <span className="text-gray-400">(선택, 안 쓰셔도 됩니다)</span>
+            <span className="text-sm font-semibold text-navy">
+              이름 · 부서 · 현재직무
+              <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
+                선택
+              </span>
             </span>
-            <span className="text-xs text-brand">{showOptional ? "접기" : "입력하기"}</span>
+            <span className="text-xs font-semibold text-brand">
+              {showOptional ? "접기 ▲" : "입력하기 ▼"}
+            </span>
           </button>
 
           {showOptional && (
-            <div className="mt-4 space-y-3">
-              <p className="rounded bg-gray-50 p-3 text-xs text-gray-500">
+            <div className="space-y-4 border-t border-gray-100 p-6">
+              <p className="rounded-lg bg-brand-50 p-3.5 text-xs leading-relaxed text-brand-800">
                 넣어주시면 AI 추천이 조금 더 정확해지고, 회사 전체 통계(부서별 평균)에 반영됩니다.
                 비워두셔도 진단과 추천은 그대로 이용하실 수 있습니다.
               </p>
-              <div>
-                <label className="mb-1 block text-sm font-medium">이름</label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="화면에서 부를 이름"
-                  className="w-full rounded border px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium">부서</label>
-                <input
-                  type="text"
-                  value={department}
-                  onChange={(e) => setDepartment(e.target.value)}
-                  placeholder="예: 영업1팀"
-                  className="w-full rounded border px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium">현재직무</label>
-                <input
-                  type="text"
-                  value={currentJob}
-                  onChange={(e) => setCurrentJob(e.target.value)}
-                  placeholder="예: 영업"
-                  className="w-full rounded border px-3 py-2 text-sm"
-                />
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div>
+                  <label className="mb-1.5 block text-sm font-semibold text-navy">이름</label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="화면에서 부를 이름"
+                    className="gp-input"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-semibold text-navy">부서</label>
+                  <input
+                    type="text"
+                    value={department}
+                    onChange={(e) => setDepartment(e.target.value)}
+                    placeholder="예: 영업1팀"
+                    className="gp-input"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-semibold text-navy">현재직무</label>
+                  <input
+                    type="text"
+                    value={currentJob}
+                    onChange={(e) => setCurrentJob(e.target.value)}
+                    placeholder="예: 영업"
+                    className="gp-input"
+                  />
+                </div>
               </div>
             </div>
           )}
-        </div>
+        </section>
 
-        <div className="space-y-4">
-          {COMPETENCIES.map((c) => (
-            <div key={c.name} className="rounded-lg border bg-white p-5 shadow-sm">
-              <p className="mb-3 text-sm font-medium">{c.description}</p>
-              <div className="flex flex-wrap gap-2">
-                {scoreOptions.map((value) => {
-                  const selected = scores[c.name] === value;
-                  return (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => setScores((prev) => ({ ...prev, [c.name]: value }))}
-                      className={`flex flex-col items-center rounded border px-3 py-1.5 text-xs ${
-                        selected
-                          ? "border-brand bg-brand text-white"
-                          : "border-gray-300 text-gray-600 hover:bg-gray-50"
-                      }`}
-                    >
-                      <span className="text-sm font-semibold">{value}</span>
-                      <span>{SCORE_LABELS[value]}</span>
-                    </button>
-                  );
-                })}
+        {/* 2단계: 역량 체크 */}
+        <section className="gp-card overflow-hidden">
+          <div className="border-b border-gray-100 bg-gray-50/70 px-6 py-3.5">
+            <h2 className="gp-section-title">
+              <span className="mr-2 text-brand">2</span>지금 내 역량은 어느 정도인가요?
+            </h2>
+          </div>
+
+          <div className="divide-y divide-gray-100">
+            {COMPETENCIES.map((c, idx) => (
+              <div key={c.name} className="p-6">
+                <div className="mb-3.5 flex items-start gap-3">
+                  <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-brand-50 text-xs font-bold text-brand">
+                    {idx + 1}
+                  </span>
+                  <div>
+                    <p className="text-sm font-bold text-navy">{c.name}</p>
+                    <p className="mt-0.5 text-xs leading-relaxed text-gray-500">
+                      {c.description.replace(`${c.name} — `, "")}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
+                  {scoreOptions.map((value) => {
+                    const selected = scores[c.name] === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setScores((prev) => ({ ...prev, [c.name]: value }))}
+                        className={`flex flex-col items-center gap-0.5 rounded-lg border px-1 py-2.5 transition ${
+                          selected
+                            ? "border-brand bg-brand text-white shadow-sm"
+                            : "border-gray-200 bg-white text-gray-500 hover:border-brand-200 hover:bg-brand-50"
+                        }`}
+                      >
+                        <span className="text-sm font-bold">{value}</span>
+                        <span className="text-[10px] leading-tight sm:text-xs">
+                          {SCORE_LABELS[value]}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </section>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && (
+          <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+            {error}
+          </p>
+        )}
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded bg-brand py-3 text-sm font-medium text-white hover:bg-brand-dark disabled:opacity-50"
-        >
-          {loading ? "제출 중..." : "제출하고 결과 보기"}
+        <button type="submit" disabled={loading} className="gp-btn w-full py-4 text-base">
+          {loading ? "제출 중..." : "제출하고 결과 보기 →"}
         </button>
       </form>
     </div>

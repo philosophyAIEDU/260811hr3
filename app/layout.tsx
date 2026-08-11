@@ -1,42 +1,26 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import SiteHeader from "@/components/SiteHeader";
 import "./globals.css";
 
-// 모든 화면에 공통으로 나오는 레이아웃입니다. (상단 메뉴 막대 포함)
+// 모든 화면에 공통으로 나오는 레이아웃입니다. (머리말 + 본문 + 꼬리말)
 export const metadata: Metadata = {
-  title: "그로우패스",
-  description: "사내 역량진단 기반 학습 추천 앱",
+  title: "그로우패스 — 사내 역량진단 학습 추천",
+  description: "역량을 스스로 점검하고 나에게 맞는 학습을 추천받는 사내 서비스",
 };
-
-const NAV_ITEMS = [
-  { href: "/", label: "시작" },
-  { href: "/diagnosis", label: "역량진단" },
-  { href: "/result", label: "내 결과" },
-  { href: "/recommend", label: "AI 추천" },
-  { href: "/learning", label: "학습현황" },
-  { href: "/settings", label: "설정" },
-  { href: "/admin", label: "관리자" },
-];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko">
-      <body className="min-h-screen bg-gray-50 text-gray-900">
-        <header className="border-b bg-white">
-          <nav className="mx-auto flex max-w-5xl flex-wrap items-center gap-1 px-4 py-3 text-sm">
-            <span className="mr-4 text-base font-bold text-brand">그로우패스</span>
-            {NAV_ITEMS.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="rounded px-3 py-1.5 text-gray-600 hover:bg-gray-100 hover:text-brand"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-        </header>
-        <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
+      <body className="min-h-screen bg-gray-50 text-navy">
+        <SiteHeader />
+        <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
+        <footer className="mt-16 border-t border-gray-200 bg-white">
+          <div className="mx-auto max-w-6xl px-4 py-8 text-xs leading-relaxed text-gray-400">
+            <p className="mb-1 font-semibold text-gray-500">그로우패스</p>
+            사내 임직원 역량 진단 및 학습 추천 서비스입니다. 진단 결과는 개인 성장 지원 목적으로만
+            활용되며, 인사 평가에 사용되지 않습니다.
+          </div>
+        </footer>
       </body>
     </html>
   );

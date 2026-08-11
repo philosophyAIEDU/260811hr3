@@ -149,77 +149,107 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="mx-auto max-w-2xl space-y-5">
       <div>
-        <h1 className="mb-1 text-xl font-bold">설정</h1>
-        <p className="text-sm text-gray-500">
-          AI 맞춤 추천(화면4)에 사용할 Gemini API 키를 관리합니다.
+        <h1 className="text-2xl font-extrabold text-navy">설정</h1>
+        <p className="mt-1.5 text-sm text-gray-500">
+          AI 맞춤 추천에 사용할 Gemini API 키를 관리합니다.
         </p>
       </div>
 
-      <section className="rounded-lg border bg-white p-5 shadow-sm">
-        <h2 className="mb-1 text-sm font-bold">개인 API 키 (선택)</h2>
-        <p className="mb-3 text-xs text-gray-500">
-          이 브라우저에만 저장되며 서버에는 저장되지 않습니다. 입력해두면 공용 키 대신 내
-          키로 AI 추천을 받습니다. {hasPersonalKey && <span className="text-brand">· 현재 저장됨</span>}
-        </p>
-        <input
-          type="password"
-          value={personalKey}
-          onChange={(e) => {
-            setPersonalKeyInput(e.target.value);
-            setPersonalTest("idle");
-          }}
-          placeholder="AIza로 시작하는 Gemini API 키"
-          className="w-full rounded border px-3 py-2 text-sm"
-        />
-        {personalError && <p className="mt-2 text-sm text-red-600">{personalError}</p>}
-        {personalTest === "success" && (
-          <p className="mt-2 text-sm text-green-600">연결에 성공했습니다.</p>
-        )}
-        {personalMessage && <p className="mt-2 text-sm text-gray-600">{personalMessage}</p>}
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button
-            onClick={handlePersonalTest}
-            disabled={personalTest === "testing"}
-            className="rounded border border-brand px-3 py-1.5 text-xs font-medium text-brand hover:bg-blue-50 disabled:opacity-50"
-          >
-            {personalTest === "testing" ? "확인 중..." : "연결 테스트"}
-          </button>
-          <button
-            onClick={handlePersonalSave}
-            className="rounded bg-brand px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-dark"
-          >
-            저장
-          </button>
+      {/* 개인 키 */}
+      <section className="gp-card overflow-hidden">
+        <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50/70 px-6 py-3.5">
+          <div>
+            <h2 className="gp-section-title">개인 API 키</h2>
+            <p className="mt-0.5 text-xs text-gray-400">이 브라우저에만 저장됩니다</p>
+          </div>
           {hasPersonalKey && (
-            <button
-              onClick={handlePersonalClear}
-              className="rounded border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
-            >
-              삭제
-            </button>
+            <span className="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-700">
+              저장됨
+            </span>
           )}
+        </div>
+
+        <div className="p-6">
+          <p className="mb-4 rounded-lg bg-gray-50 p-3.5 text-xs leading-relaxed text-gray-500">
+            서버에는 저장되지 않습니다. 입력해두면 공용 키 대신 내 키로 AI 추천을 받습니다.
+            <br />
+            키 발급: Google AI Studio (aistudio.google.com/apikey)
+          </p>
+
+          <input
+            type="password"
+            value={personalKey}
+            onChange={(e) => {
+              setPersonalKeyInput(e.target.value);
+              setPersonalTest("idle");
+            }}
+            placeholder="AIza로 시작하는 Gemini API 키"
+            className="gp-input"
+          />
+
+          {personalError && <p className="mt-2.5 text-sm text-red-600">{personalError}</p>}
+          {personalTest === "success" && (
+            <p className="mt-2.5 text-sm font-medium text-brand">✓ 연결에 성공했습니다.</p>
+          )}
+          {personalMessage && <p className="mt-2.5 text-sm text-gray-500">{personalMessage}</p>}
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              onClick={handlePersonalTest}
+              disabled={personalTest === "testing"}
+              className="gp-btn-ghost"
+            >
+              {personalTest === "testing" ? "확인 중..." : "연결 테스트"}
+            </button>
+            <button
+              onClick={handlePersonalSave}
+              className="rounded-lg bg-brand px-4 py-2 text-xs font-bold text-white transition hover:bg-brand-600"
+            >
+              저장
+            </button>
+            {hasPersonalKey && (
+              <button onClick={handlePersonalClear} className="gp-btn-ghost">
+                삭제
+              </button>
+            )}
+          </div>
         </div>
       </section>
 
-      <section className="rounded-lg border bg-white p-5 shadow-sm">
-        <h2 className="mb-1 text-sm font-bold">공용 API 키 (관리자 전용)</h2>
-        <p className="mb-3 text-xs text-gray-500">
-          개인 키가 없는 직원은 이 공용 키로 AI 추천을 받습니다. 현재 상태:{" "}
-          {sharedConfigured === null
-            ? "확인 중..."
-            : sharedConfigured
-            ? "설정되어 있음"
-            : "설정되어 있지 않음"}
-        </p>
-        <div className="space-y-2">
+      {/* 공용 키 */}
+      <section className="gp-card overflow-hidden">
+        <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50/70 px-6 py-3.5">
+          <div>
+            <h2 className="gp-section-title">공용 API 키</h2>
+            <p className="mt-0.5 text-xs text-gray-400">관리자 전용 · 전 직원이 함께 사용</p>
+          </div>
+          <span
+            className={`rounded-full px-2.5 py-1 text-xs font-bold ${
+              sharedConfigured === null
+                ? "bg-gray-100 text-gray-400"
+                : sharedConfigured
+                ? "bg-brand-50 text-brand-700"
+                : "bg-gray-100 text-gray-500"
+            }`}
+          >
+            {sharedConfigured === null ? "확인 중" : sharedConfigured ? "설정됨" : "미설정"}
+          </span>
+        </div>
+
+        <div className="space-y-3 p-6">
+          <p className="rounded-lg bg-gray-50 p-3.5 text-xs leading-relaxed text-gray-500">
+            개인 키가 없는 직원은 이 공용 키로 AI 추천을 받습니다. 보안을 위해 저장된 키 값은
+            화면에 다시 표시되지 않고, 설정 여부만 보여드립니다.
+          </p>
+
           <input
             type="password"
             value={adminCode}
             onChange={(e) => setAdminCode(e.target.value)}
             placeholder="관리자 코드"
-            className="w-full rounded border px-3 py-2 text-sm"
+            className="gp-input"
           />
           <input
             type="password"
@@ -229,34 +259,33 @@ export default function SettingsPage() {
               setSharedTest("idle");
             }}
             placeholder="새로 저장할 Gemini API 키"
-            className="w-full rounded border px-3 py-2 text-sm"
+            className="gp-input"
           />
-        </div>
-        {sharedError && <p className="mt-2 text-sm text-red-600">{sharedError}</p>}
-        {sharedTest === "success" && (
-          <p className="mt-2 text-sm text-green-600">연결에 성공했습니다.</p>
-        )}
-        {sharedMessage && <p className="mt-2 text-sm text-gray-600">{sharedMessage}</p>}
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button
-            onClick={handleSharedTest}
-            disabled={sharedTest === "testing"}
-            className="rounded border border-brand px-3 py-1.5 text-xs font-medium text-brand hover:bg-blue-50 disabled:opacity-50"
-          >
-            {sharedTest === "testing" ? "확인 중..." : "연결 테스트"}
-          </button>
-          <button
-            onClick={handleSharedSave}
-            className="rounded bg-brand px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-dark"
-          >
-            저장
-          </button>
-          <button
-            onClick={handleSharedDelete}
-            className="rounded border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
-          >
-            삭제
-          </button>
+
+          {sharedError && <p className="text-sm text-red-600">{sharedError}</p>}
+          {sharedTest === "success" && (
+            <p className="text-sm font-medium text-brand">✓ 연결에 성공했습니다.</p>
+          )}
+          {sharedMessage && <p className="text-sm text-gray-500">{sharedMessage}</p>}
+
+          <div className="flex flex-wrap gap-2 pt-1">
+            <button
+              onClick={handleSharedTest}
+              disabled={sharedTest === "testing"}
+              className="gp-btn-ghost"
+            >
+              {sharedTest === "testing" ? "확인 중..." : "연결 테스트"}
+            </button>
+            <button
+              onClick={handleSharedSave}
+              className="rounded-lg bg-brand px-4 py-2 text-xs font-bold text-white transition hover:bg-brand-600"
+            >
+              저장
+            </button>
+            <button onClick={handleSharedDelete} className="gp-btn-ghost">
+              삭제
+            </button>
+          </div>
         </div>
       </section>
     </div>
